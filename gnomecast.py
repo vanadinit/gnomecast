@@ -1,4 +1,15 @@
-import contextlib, os, re, signal, socket, subprocess, sys, tempfile, threading, time, traceback, urllib
+import contextlib
+import os
+import re
+import signal
+import socket
+import subprocess
+import sys
+import tempfile
+import threading
+import time
+import traceback
+import urllib
 
 DEPS_MET = True
 try:
@@ -7,8 +18,8 @@ try:
     import html5lib.treebuilders
 
     # hack fixing pycaption needing an old version of html5lib
-    if not hasattr(html5lib.treebuilders, '_base'):
-        html5lib.treebuilders._base = html5lib.treebuilders.base
+    #if not hasattr(html5lib.treebuilders, '_base'):
+    #    html5lib.treebuilders._base = html5lib.treebuilders.base
 
     import pycaption
 except Exception as e:
@@ -80,7 +91,7 @@ def throttle(seconds=2):
         def wrapper(*args, **kwargs):
             nonlocal timer, lastest_args, latest_kwargs
             lastest_args, latest_kwargs = args, kwargs
-            if timer == None:
+            if timer is None:
                 timer = threading.Timer(seconds, run_f)
                 timer.start()
 
@@ -588,14 +599,14 @@ class Gnomecast(object):
             self.cast_store.append([None, "Select a cast device..."])
             self.cast_store.append([-1, 'Add a non-local Chromecast...'])
             for cc in chromecasts:
-                friendly_name = cc.device.friendly_name
+                friendly_name = cc.name
                 if cc.cast_type != 'cast':
                     friendly_name = '%s (%s)' % (friendly_name, cc.cast_type)
                 self.cast_store.append([cc, friendly_name])
             if device:
                 found = False
                 for i, cc in enumerate(chromecasts):
-                    if device == cc.device.friendly_name:
+                    if device == cc.name:
                         self.cast_combo.set_active(i + 1)
                         found = True
                 if not found:
