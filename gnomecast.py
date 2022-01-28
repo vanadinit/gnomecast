@@ -174,7 +174,7 @@ class FileMetadata(object):
             os.remove(thumbnail_fn)
             self._ffmpeg_output = _ffmpeg_output if _ffmpeg_output else subprocess.check_output(
                 ['ffmpeg', '-i', fn, '-f', 'ffmetadata', '-', '-f', 'mjpeg', '-vframes', '1', '-ss', '27', '-vf',
-                 'scale=600:-1', thumbnail_fn],
+                 'scale=200:-1', thumbnail_fn],
                 stderr=subprocess.STDOUT
             ).decode()
             _important_ffmpeg = []
