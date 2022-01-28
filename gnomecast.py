@@ -304,6 +304,31 @@ class Transcoder(object):
         self.done_callback = done_callback
         self.error_callback = error_callback
         print('transcode, transcode_video, transcode_audio', self.transcode, self.transcode_video, self.transcode_audio)
+
+        # Uncomment next line to test different formats without transcoding
+        #self.transcode = False
+        #
+        # See also https://developers.google.com/cast/docs/media
+        # Test results:
+        # extension / video codec / audio codec
+        # --------------------------
+        # working:
+        # - avi  / h264  / aac
+        # - avi  / h264  / mp3
+        # - mkv  / h264  / vorbis
+        # - webm / vp8   / vorbis
+        # --------------------------
+        # failing:
+        # - avi  / msmpeg4v3  / mp3
+        # - avi  / msmpeg4v3  / mp3 (only audio works)
+        # - avi  / mpeg4      / ac3
+        # - avi  / mpeg4      / mp3 (only audio works)
+        # - avi  / rawvideo   / pcm_s16le
+        # - mkv  / h264       / ac3 (only video works)
+        # - mp4  / hevc       / aac (only audio works)
+        # - mp4  / mpeg4      / aac (only audio works)
+        # - mpg  / mpeg1video / mp2
+
         if self.transcode:
             self.done = False
             dir = '/var/tmp' if os.path.isdir('/var/tmp') else None
@@ -1006,6 +1031,7 @@ class Gnomecast(object):
                 kwargs['current_time'] = current_time
             ext = self.fn.split('.')[-1]
             ext = ''.join(ch for ch in ext if ch.isalnum()).lower()
+            # Video content type seems to be unimportant? My chromecast plays the videos anyway.
             mc.play_media('http://%s:%s/media/%s.%s' % (self.ip, self.port, hash(self.fn), ext),
                           'audio/%s' % ext if ext in AUDIO_EXTS else 'video/mp4', **kwargs)
             print(cast.status)
