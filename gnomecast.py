@@ -11,6 +11,11 @@ import time
 import traceback
 import urllib
 
+# TODO
+#  - arg_parse
+#  - refactoring: split in multiple files, functions, ...
+#  - new feature: controls via chromecast? play, pause, stop
+
 DEPS_MET = True
 try:
     import pychromecast
@@ -290,8 +295,7 @@ class Transcoder(object):
         print('Transcoder', fn)
         transcode_container = fmd.container not in ('mp4', 'aac', 'mp3', 'wav')
         self.transcode_video = force_video or not self.can_play_video_codec(video_stream.codec)
-        self.transcode_audio = force_audio or fmd.container not in AUDIO_EXTS or not self.can_play_audio_stream(
-            self.audio_stream)
+        self.transcode_audio = force_audio or not self.can_play_audio_stream(self.audio_stream)
         self.transcode = transcode_container or self.transcode_video or self.transcode_audio
         self.trans_fn = None
 
@@ -344,7 +348,8 @@ class Transcoder(object):
 
     def can_play_video_codec(self, video_codec):
         h265 = True
-        if self.cast.cast_type == 'audio': h265 = False
+        if self.cast.cast_type == 'audio':
+            h265 = False
         device_info = HARDWARE.get((self.cast.cast_info.manufacturer, self.cast.model_name))
         if device_info and device_info.h265 is not None:
             h265 = device_info.h265
@@ -354,7 +359,8 @@ class Transcoder(object):
             return video_codec in ('h264',)
 
     def can_play_audio_stream(self, stream):
-        if not stream: return True
+        if not stream:
+            return True
         device_info = HARDWARE.get((self.cast.cast_info.manufacturer, self.cast.model_name))
         ac3 = device_info.ac3 if device_info else None
         if ac3:
