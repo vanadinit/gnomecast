@@ -18,7 +18,7 @@ try:
     import html5lib.treebuilders
 
     # hack fixing pycaption needing an old version of html5lib
-    #if not hasattr(html5lib.treebuilders, '_base'):
+    # if not hasattr(html5lib.treebuilders, '_base'):
     #    html5lib.treebuilders._base = html5lib.treebuilders.base
 
     import pycaption
@@ -274,7 +274,6 @@ class FileMetadata(object):
 
 
 class Transcoder(object):
-
     def __init__(self, cast, fmd, video_stream, audio_stream, done_callback, error_callback, prev_transcoder=None,
                  force_audio=False, force_video=False, fake=False):
         self.fmd = fmd
@@ -304,8 +303,8 @@ class Transcoder(object):
         if self.transcode:
             self.done = False
             dir = '/var/tmp' if os.path.isdir('/var/tmp') else None
-            self.trans_fn = tempfile.mkstemp(suffix='.mp4', prefix='gnomecast_pid%i_transcode_' % os.getpid(), dir=dir)[
-                1]
+            self.trans_fn = tempfile.mkstemp(
+                suffix='.mp4', prefix='gnomecast_pid%i_transcode_' % os.getpid(), dir=dir)[1]
             os.remove(self.trans_fn)
 
             device_info = HARDWARE.get((self.cast.cast_info.manufacturer, self.cast.model_name))
@@ -314,9 +313,12 @@ class Transcoder(object):
 
             self.transcode_cmd = ['ffmpeg', '-i', self.source_fn, '-map', self.video_stream.index]
             if self.audio_stream:
-                self.transcode_cmd += ['-map', self.audio_stream.index, '-c:a',
-                                       transcode_audio_to if self.transcode_audio else 'copy'] + (
-                                          ['-b:a', '256k'] if self.transcode_audio else [])
+                self.transcode_cmd += [
+                    '-map', self.audio_stream.index,
+                    '-c:a', transcode_audio_to if self.transcode_audio else 'copy'
+                ]
+                if self.transcode_audio:
+                    self.transcode_cmd += ['-b:a', '256k']
             self.transcode_cmd += ['-c:v', 'h264' if self.transcode_video else 'copy']  # '-movflags', 'faststart'
             self.transcode_cmd += [self.trans_fn]
             print(' '.join(["'%s'" % s if ' ' in s else s for s in self.transcode_cmd]))
@@ -677,8 +679,8 @@ class Gnomecast(object):
         win.add(vbox_outer)
 
         # list of queued files
-        self.files_store = Gtk.ListStore(str, str, int, str, str, int, str, object,
-                                         object)  # name, path, duration, duration_str, thumbnail_fn, transcode_progress, status_icon, transcoder, file_metadata
+        # name, path, duration, duration_str, thumbnail_fn, transcode_progress, status_icon, transcoder, file_metadata
+        self.files_store = Gtk.ListStore(str, str, int, str, str, int, str, object, object)
         self.files_store.connect("row-inserted", self.update_button_visible)
         self.files_store.connect("row-deleted", self.update_button_visible)
         self.files_view = Gtk.TreeView(self.files_store)
@@ -1191,13 +1193,25 @@ class Gnomecast(object):
                     transcoder = row[7]
                     fmd = row[8]
                     fmd.wait()
-                    if not self.video_stream: self.video_stream = fmd.video_streams[0]
-                    if not self.audio_stream and fmd.audio_streams: self.audio_stream = fmd.audio_streams[0]
-                    if not transcoder or self.cast != transcoder.cast or self.fn != transcoder.source_fn or self.audio_stream != transcoder.audio_stream:
-                        self.transcoder = Transcoder(self.cast, fmd, self.video_stream, self.audio_stream,
-                                                     lambda did_transcode=None: GLib.idle_add(self.update_status,
-                                                                                              did_transcode),
-                                                     self.error_callback, transcoder)
+                    if not self.video_stream:
+                        self.video_stream = fmd.video_streams[0]
+                    if not self.audio_stream and fmd.audio_streams:
+                        self.audio_stream = fmd.audio_streams[0]
+                    if (
+                        not transcoder
+                        or self.cast != transcoder.cast
+                        or self.fn != transcoder.source_fn
+                        or self.audio_stream != transcoder.audio_stream
+                    ):
+                        self.transcoder = Transcoder(
+                            cast=self.cast,
+                            fmd=fmd,
+                            video_stream=self.video_stream,
+                            audio_stream=self.audio_stream,
+                            done_callback=lambda did_transcode=None: GLib.idle_add(self.update_status, did_transcode),
+                            error_callback=self.error_callback,
+                            prev_transcoder=transcoder,
+                        )
                         row[7] = self.transcoder
                 if self.autoplay:
                     self.autoplay = False
@@ -1313,11 +1327,13 @@ class Gnomecast(object):
 
     def error_callback(self, msg):
         def f():
-            dialogWindow = Gtk.MessageDialog(self.win,
-                                             Gtk.DialogFlags.MODAL | Gtk.DialogFlags.DESTROY_WITH_PARENT,
-                                             Gtk.MessageType.INFO,
-                                             Gtk.ButtonsType.OK,
-                                             '\nGnomecast encountered an error converting your file.')
+            dialogWindow = Gtk.MessageDialog(
+                self.win,
+                Gtk.DialogFlags.MODAL | Gtk.DialogFlags.DESTROY_WITH_PARENT,
+                Gtk.MessageType.INFO,
+                Gtk.ButtonsType.OK,
+                '\nGnomecast encountered an error converting your file.'
+            )
             dialogWindow.set_title('Transcoding Error')
             dialogWindow.set_default_size(1, 400)
 
@@ -1344,12 +1360,14 @@ class Gnomecast(object):
         msg = '\n' + fmd.details()
         if self.cast:
             msg += '\nDevice: %s (%s)' % (self.cast.model_name, self.cast.cast_info.manufacturer)
-        msg += '\nChromecast: v%s' % (__version__)
-        dialogWindow = Gtk.MessageDialog(self.win,
-                                         Gtk.DialogFlags.MODAL | Gtk.DialogFlags.DESTROY_WITH_PARENT,
-                                         Gtk.MessageType.INFO,
-                                         Gtk.ButtonsType.OK,
-                                         msg)
+        msg += '\nChromecast: v%s' % __version__
+        dialogWindow = Gtk.MessageDialog(
+            self.win,
+            Gtk.DialogFlags.MODAL | Gtk.DialogFlags.DESTROY_WITH_PARENT,
+            Gtk.MessageType.INFO,
+            Gtk.ButtonsType.OK,
+            msg,
+        )
         dialogWindow.set_title('File Info')
         dialogWindow.set_default_size(1, 400)
 
@@ -1392,11 +1410,13 @@ class Gnomecast(object):
         dialogWindow.destroy()
 
     def get_nonlocal_cast(self):
-        dialogWindow = Gtk.MessageDialog(self.win,
-                                         Gtk.DialogFlags.MODAL | Gtk.DialogFlags.DESTROY_WITH_PARENT,
-                                         Gtk.MessageType.QUESTION,
-                                         Gtk.ButtonsType.OK_CANCEL,
-                                         '\nPlease specify the IP address or hostname of a Chromecast device:')
+        dialogWindow = Gtk.MessageDialog(
+            self.win,
+            Gtk.DialogFlags.MODAL | Gtk.DialogFlags.DESTROY_WITH_PARENT,
+            Gtk.MessageType.QUESTION,
+            Gtk.ButtonsType.OK_CANCEL,
+            '\nPlease specify the IP address or hostname of a Chromecast device:',
+        )
 
         dialogWindow.set_title('Add a non-local Chromecast')
 
