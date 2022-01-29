@@ -1,6 +1,6 @@
 import os
 
-from setuptools import setup
+from setuptools import setup, find_packages
 
 
 def long_description():
@@ -21,7 +21,7 @@ setup(
     author='Derek Anderson',
     author_email='public@kered.org',
     url='https://github.com/keredson/gnomecast',
-    py_modules=['gnomecast'],
+    packages=find_packages(),
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'Intended Audience :: End Users/Desktop',
