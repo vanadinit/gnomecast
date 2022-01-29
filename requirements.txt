@@ -1,5 +1,5 @@
 html5lib
-pychromecast
+pychromecast>=10.0
 bottle
 pycaption
 paste
