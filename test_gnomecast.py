@@ -1,5 +1,7 @@
 import unittest
 import gnomecast
+import gnomecast.metadata
+import gnomecast.transcoder
 
 
 class FakeCast:
@@ -15,7 +17,7 @@ class FakeDevice:
 class TestGnomecast(unittest.TestCase):
 
     def test_1(self):
-        fmd = gnomecast.FileMetadata(
+        fmd = gnomecast.metadata.FileMetadata(
             'pCU2GE07KW4.mkv',
             _ffmpeg_output='''
 ffprobe version 4.1.4 Copyright (c) 2007-2019 the FFmpeg developers
@@ -59,14 +61,14 @@ Input #0, matroska,webm, from 'pCU2GE07KW4.mkv':
         self.assertEqual(len(fmd.subtitles), 0)
 
         cast = FakeCast(cast_type='video', manufacturer='Unknown manufacturer', model_name='Chromecast')
-        transcoder = gnomecast.Transcoder(cast, fmd, fmd.video_streams[0], fmd.audio_streams[0], None, fake=True)
+        transcoder = gnomecast.transcoder.Transcoder(cast, fmd, fmd.video_streams[0], fmd.audio_streams[0], None, fake=True)
 
         self.assertEqual(transcoder.transcode_cmd[:-1],
                          ['ffmpeg', '-i', 'pCU2GE07KW4.mkv', '-map', '0:0', '-map', '0:1', '-c:v', 'copy', '-c:a',
                           'mp3', '-b:a', '256k'])
 
     def test_2(self):
-        fmd = gnomecast.FileMetadata(
+        fmd = gnomecast.metadata.FileMetadata(
             'Godzilla - King of the Monsters (2019) (2160p BluRay x265 10bit HDR Tigole).mkv',
             _ffmpeg_output='''
 Input #0, matroska,webm, from 'Godzilla - King of the Monsters (2019) (2160p BluRay x265 10bit HDR Tigole).mkv':
@@ -218,34 +220,34 @@ Input #0, matroska,webm, from 'Godzilla - King of the Monsters (2019) (2160p Blu
 
         cast = FakeCast(cast_type='video', manufacturer='Unknown manufacturer', model_name='Chromecast Ultra')
 
-        transcoder = gnomecast.Transcoder(cast, fmd, fmd.video_streams[0], fmd.audio_streams[0], None, fake=True)
+        transcoder = gnomecast.transcoder.Transcoder(cast, fmd, fmd.video_streams[0], fmd.audio_streams[0], None, fake=True)
         self.assertEqual(transcoder.transcode_cmd[:-1], ['ffmpeg', '-i',
                                                          'Godzilla - King of the Monsters (2019) (2160p BluRay x265 10bit HDR Tigole).mkv',
                                                          '-map', '0:0', '-map', '0:1', '-c:v', 'copy', '-c:a', 'ac3',
                                                          '-b:a', '256k'])
 
-        transcoder = gnomecast.Transcoder(cast, fmd, fmd.video_streams[0], fmd.audio_streams[1], None, fake=True)
+        transcoder = gnomecast.transcoder.Transcoder(cast, fmd, fmd.video_streams[0], fmd.audio_streams[1], None, fake=True)
         self.assertEqual(transcoder.transcode_cmd[:-1], ['ffmpeg', '-i',
                                                          'Godzilla - King of the Monsters (2019) (2160p BluRay x265 10bit HDR Tigole).mkv',
                                                          '-map', '0:0', '-map', '0:2', '-c:v', 'copy', '-c:a', 'mp3',
                                                          '-b:a', '256k'])
 
         cast = FakeCast(cast_type='video', manufacturer='Unknown manufacturer', model_name='Chromecast')
-        transcoder = gnomecast.Transcoder(cast, fmd, fmd.video_streams[0], fmd.audio_streams[0], None, fake=True)
+        transcoder = gnomecast.transcoder.Transcoder(cast, fmd, fmd.video_streams[0], fmd.audio_streams[0], None, fake=True)
         self.assertEqual(transcoder.transcode_cmd[:-1], ['ffmpeg', '-i',
                                                          'Godzilla - King of the Monsters (2019) (2160p BluRay x265 10bit HDR Tigole).mkv',
                                                          '-map', '0:0', '-map', '0:1', '-c:v', 'h264', '-c:a', 'mp3',
                                                          '-b:a', '256k'])
 
         cast = FakeCast(cast_type='video', manufacturer='VIZIO', model_name='P75-F1')
-        transcoder = gnomecast.Transcoder(cast, fmd, fmd.video_streams[0], fmd.audio_streams[0], None, fake=True)
+        transcoder = gnomecast.transcoder.Transcoder(cast, fmd, fmd.video_streams[0], fmd.audio_streams[0], None, fake=True)
         self.assertEqual(transcoder.transcode_cmd[:-1], ['ffmpeg', '-i',
                                                          'Godzilla - King of the Monsters (2019) (2160p BluRay x265 10bit HDR Tigole).mkv',
                                                          '-map', '0:0', '-map', '0:1', '-c:v', 'copy', '-c:a', 'ac3',
                                                          '-b:a', '256k'])
 
         cast = FakeCast(cast_type='video', manufacturer='UNK', model_name='UNK')
-        transcoder = gnomecast.Transcoder(cast, fmd, fmd.video_streams[0], fmd.audio_streams[0], None, fake=True)
+        transcoder = gnomecast.transcoder.Transcoder(cast, fmd, fmd.video_streams[0], fmd.audio_streams[0], None, fake=True)
         self.assertEqual(transcoder.transcode_cmd[:-1], ['ffmpeg', '-i',
                                                          'Godzilla - King of the Monsters (2019) (2160p BluRay x265 10bit HDR Tigole).mkv',
                                                          '-map', '0:0', '-map', '0:1', '-c:v', 'copy', '-c:a', 'ac3',
