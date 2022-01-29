@@ -7,16 +7,20 @@ import time
 import pycaption
 
 
-class StreamMetadata:
+class Metadata:
+    def __repr__(self):
+        fields = [f'{k}:{v}' for k, v in self.__dict__.items() if v is not None and not k.startswith('_')]
+        return '{class_name}({fields})'.format(
+            class_name=self.__class__.__name__,
+            fields=', '.join(fields)
+        )
 
+
+class StreamMetadata(Metadata):
     def __init__(self, index, codec, title=None):
         self.index = index
         self.codec = codec
         self.title = title
-
-    def __repr__(self):
-        fields = ['%s:%s' % (k, v) for k, v in self.__dict__.items() if v is not None and not k.startswith('_')]
-        return '%s(%s)' % (self.__class__.__name__, ', '.join(fields))
 
 
 class AudioMetadata(StreamMetadata):
@@ -35,17 +39,17 @@ class AudioMetadata(StreamMetadata):
             channels = '7.1'
         else:
             channels = str(self.channels)
-        return '%s (%s/%s)' % (self.title, self.codec, channels)
+        return f'{self.title} ({self.codec}/{channels})'
 
 
-class FileMetadata(object):
+class FileMetadata(Metadata):
     def __init__(self, fn, callback=None, _ffmpeg_output=None):
         self.fn = fn
         self.ready = False
 
         def parse():
             self.thumbnail_fn = None
-            thumbnail_fn = tempfile.mkstemp(suffix='.jpg', prefix='gnomecast_pid%i_thumbnail_' % os.getpid())[1]
+            thumbnail_fn = tempfile.mkstemp(suffix='.jpg', prefix=f'gnomecast_pid{os.getpid()}_thumbnail_')[1]
             os.remove(thumbnail_fn)
             self._ffmpeg_output = _ffmpeg_output if _ffmpeg_output else subprocess.check_output(
                 ['ffmpeg', '-i', fn, '-f', 'ffmetadata', '-', '-f', 'mjpeg', '-vframes', '1', '-ss', '27', '-vf',
@@ -116,7 +120,8 @@ class FileMetadata(object):
             time.sleep(1)
 
     def load_subtitles(self):
-        if not self.subtitles: return
+        if not self.subtitles:
+            return
         cmd = ['ffmpeg', '-y', '-i', self.fn, '-vn', '-an', ]
         files = []
         for stream in self.subtitles:
@@ -135,19 +140,18 @@ class FileMetadata(object):
                 converter.read(caps, pycaption.detect_format(caps)())
                 stream._subtitles = converter.write(pycaption.WebVTTWriter())
                 os.remove(srt_fn)
-        except subprocess.CalledProcessError as e:
-            print('ERROR processing subtitles:', e)
+        except subprocess.CalledProcessError as exc:
+            print('ERROR processing subtitles:', exc)
             self.subtitles = []
 
-    def __repr__(self):
-        fields = ['%s:%s' % (k, v) for k, v in self.__dict__.items() if not k.startswith('_')]
-        return 'FileMetadata(%s)' % ', '.join(fields)
-
     def details(self):
-        fields = [
-            'File: %s' % os.path.basename(self.fn),
-            'Video: %s' % ', '.join(['%s (%s)' % (s.title, s.codec) for s in self.video_streams]),
-            'Audio: %s' % ', '.join([s.details() for s in self.audio_streams]),
-            'Subtitles: %s' % ', '.join([s.title for s in self.subtitles]),
-        ]
-        return '\n'.join(fields)
+        return \
+            'File: {file}\n' \
+            'Video: {video}\n' \
+            'Audio: {audio}\n' \
+            'Subtitles: {subtitles}\n'.format(
+                file=os.path.basename(self.fn),
+                video=', '.join([f'{vis.title} ({vis.codec})' for vis in self.video_streams]),
+                audio=', '.join([aus.details() for aus in self.audio_streams]),
+                subtitles=', '.join([s.title for s in self.subtitles]),
+            )

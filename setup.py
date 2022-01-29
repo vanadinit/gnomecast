@@ -30,6 +30,7 @@ setup(
         'Programming Language :: Python',
         'Programming Language :: Python :: 3',
     ],
+    python_requires='>=3.6',
     install_requires=['pychromecast', 'bottle', 'pycaption', 'paste', 'html5lib'],
     data_files=[
         ('share/icons/hicolor/16x16/apps', ['icons/gnomecast_16.png']),
