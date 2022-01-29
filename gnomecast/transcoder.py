@@ -38,10 +38,11 @@ class Transcoder(object):
             prev_transcoder.destroy()
 
         print('Transcoder', fn)
-        transcode_container = fmd.container not in ('mp4', 'aac', 'mp3', 'wav')
+        # As far as I discovered the container format is not significant for the transcoding decision.
+        # transcode_container = fmd.container not in ('mp4', 'aac', 'mp3', 'wav')
         self.transcode_video = force_video or self.video_needs_transcode(self.video_stream)
         self.transcode_audio = force_audio or self.audio_needs_transcode(self.audio_stream)
-        self.transcode = transcode_container or self.transcode_video or self.transcode_audio
+        self.transcode = self.transcode_video or self.transcode_audio
         self.trans_fn = None
 
         self.progress_bytes = 0

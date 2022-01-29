@@ -3,3 +3,4 @@ pychromecast>=10.0
 bottle
 pycaption
 paste
+ffmpeg-python

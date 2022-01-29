@@ -5,6 +5,7 @@ import threading
 import time
 
 import pycaption
+import ffmpeg
 
 
 class Metadata:
@@ -24,9 +25,9 @@ class StreamMetadata(Metadata):
 
 
 class AudioMetadata(StreamMetadata):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, channels: int = 2, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.channels = 2
+        self.channels = channels
 
     def details(self):
         if self.channels == 1:
@@ -46,74 +47,57 @@ class FileMetadata(Metadata):
     def __init__(self, fn, callback=None, _ffmpeg_output=None):
         self.fn = fn
         self.ready = False
+        self.thumbnail_fn = None
+        self.container = fn.lower().split(".")[-1]
+        self.video_streams = []
+        self.audio_streams = []
+        self.subtitles = []
+        self.ffoutput = ''
 
         def parse():
-            self.thumbnail_fn = None
-            thumbnail_fn = tempfile.mkstemp(suffix='.jpg', prefix=f'gnomecast_pid{os.getpid()}_thumbnail_')[1]
-            os.remove(thumbnail_fn)
-            self._ffmpeg_output = _ffmpeg_output if _ffmpeg_output else subprocess.check_output(
-                ['ffmpeg', '-i', fn, '-f', 'ffmetadata', '-', '-f', 'mjpeg', '-vframes', '1', '-ss', '27', '-vf',
-                 'scale=200:-1', thumbnail_fn],
-                stderr=subprocess.STDOUT
-            ).decode()
-            _important_ffmpeg = []
-            if os.path.isfile(thumbnail_fn):
-                self.thumbnail_fn = thumbnail_fn
-            output = self._ffmpeg_output.split('\n')
-            self.container = fn.lower().split(".")[-1]
-            self.video_streams = []
-            self.audio_streams = []
-            self.subtitles = []
-            stream = None
-            for line in output:
-                line = line.strip()
-                if line.startswith('ffmpeg version'):
-                    _important_ffmpeg.append(line)
-                if line.startswith('Stream') and 'Video' in line:
-                    _important_ffmpeg.append(line)
-                    id = line.split()[1].strip('#').strip(':')
-                    title = 'Video #%i' % (len(self.video_streams) + 1)
-                    if '(' in id:
-                        title = id[id.index('(') + 1:id.index(')')]
-                        id = id[:id.index('(')]
-                    video_codec = line.split()[3]
-                    stream = StreamMetadata(id, video_codec, title=title)
-                    self.video_streams.append(stream)
-                elif line.startswith('Stream') and 'Audio' in line:
-                    _important_ffmpeg.append(line)
-                    title = 'Audio #%i' % (len(self.audio_streams) + 1)
-                    id = line.split()[1].strip('#').strip(':')
-                    if '(' in id:
-                        title = id[id.index('(') + 1:id.index(')')]
-                        id = id[:id.index('(')]
-                    audio_codec = line.split()[3].strip(',')
-                    stream = AudioMetadata(id, audio_codec, title=title)
-                    if ', stereo, ' in line: stream.channels = 1
-                    if ', stereo, ' in line: stream.channels = 2
-                    if ', 5.1' in line: stream.channels = 6
-                    if ', 7.1' in line: stream.channels = 8
-                    self.audio_streams.append(stream)
-                elif line.startswith('Stream') and 'Subtitle' in line:
-                    _important_ffmpeg.append(line)
-                    id = line.split()[1].strip('#').strip(':')
-                    print(line, id)
-                    if '(' in id:
-                        title = id[id.index('(') + 1:id.index(')')]
-                        id = id[:id.index('(')]
-                    stream = StreamMetadata(id, None, title=title)
-                    self.subtitles.append(stream)
-                elif stream and line.startswith('title'):
-                    _important_ffmpeg.append(line)
-                    stream.title = line.split()[2]
-                elif line.startswith('Output'):
-                    break
-            self._important_ffmpeg = '\n'.join(_important_ffmpeg)
+            self.create_thumbnail()
+            self.ffprobe()
+            self._important_ffmpeg = 'ffmpeg is now used in a different way'
             if not _ffmpeg_output:
                 self.load_subtitles()
             self.ready = True
-            if callback: callback(self)
+            if callback:
+                callback(self)
 
         threading.Thread(target=parse).start()
+
+    def create_thumbnail(self):
+        thumbnail_fn = tempfile.mkstemp(suffix='.jpg', prefix=f'gnomecast_pid{os.getpid()}_thumbnail_')[1]
+        os.remove(thumbnail_fn)
+        ffmpeg.input(filename=self.fn, ss=27).filter('scale', 200, -1).output(thumbnail_fn, vframes=1).run()
+        if os.path.isfile(thumbnail_fn):
+            self.thumbnail_fn = thumbnail_fn
+
+    def ffprobe(self):
+        data = ffmpeg.probe(self.fn)
+        self.ffoutput = data
+        for stream in data['streams']:
+            # First number refers to the input file, which is always 0, if we have just one
+            index = '0:{}'.format(stream['index'])
+            if stream.get('codec_type') == 'video':
+                self.video_streams.append(StreamMetadata(
+                    index=index,
+                    codec=stream['codec_name'],
+                    title=stream.get('tags', {}).get('language', f'Video #{len(self.video_streams) + 1}'),
+                ))
+            elif stream.get('codec_type') == 'audio':
+                self.audio_streams.append(AudioMetadata(
+                    index=index,
+                    codec=stream['codec_name'],
+                    title=stream.get('tags', {}).get('language', f'Audio #{len(self.audio_streams) + 1}'),
+                    channels=stream['channels'],
+                ))
+            elif stream.get('codec_type') == 'subtitle':
+                self.subtitles.append(StreamMetadata(
+                    index=index,
+                    codec=None,
+                    title=stream['tags']['language'],
+                ))
 
     def wait(self):
         while not self.ready:
