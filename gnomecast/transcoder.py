@@ -15,6 +15,7 @@ class Device:
 
 HARDWARE = {
     ('Unknown manufacturer', 'Chromecast'): Device(h265=False, ac3=False),
+    ('Google Inc.', 'Chromecast'): Device(h265=False, ac3=False),
     ('Unknown manufacturer', 'Chromecast Ultra'): Device(h265=True, ac3=True),
     ('Unknown manufacturer', 'Google Home Mini'): Device(h265=False, ac3=False),
     ('Unknown manufacturer', 'Google Home'): Device(h265=False, ac3=False),
@@ -38,8 +39,8 @@ class Transcoder(object):
 
         print('Transcoder', fn)
         transcode_container = fmd.container not in ('mp4', 'aac', 'mp3', 'wav')
-        self.transcode_video = force_video or not self.can_play_video_codec(video_stream.codec)
-        self.transcode_audio = force_audio or not self.can_play_audio_stream(self.audio_stream)
+        self.transcode_video = force_video or self.video_needs_transcode(self.video_stream)
+        self.transcode_audio = force_audio or self.audio_needs_transcode(self.audio_stream)
         self.transcode = transcode_container or self.transcode_video or self.transcode_audio
         self.trans_fn = None
 
@@ -94,6 +95,7 @@ class Transcoder(object):
                     self.transcode_cmd += ['-b:a', '256k']
             self.transcode_cmd += ['-c:v', 'h264' if self.transcode_video else 'copy']  # '-movflags', 'faststart'
             self.transcode_cmd += [self.trans_fn]
+            print(self.transcode_cmd)
             print(' '.join(["'%s'" % s if ' ' in s else s for s in self.transcode_cmd]))
             if fake:
                 self.p = None
@@ -115,27 +117,36 @@ class Transcoder(object):
     def fn(self):
         return self.trans_fn if self.transcode else self.source_fn
 
-    def can_play_video_codec(self, video_codec):
-        h265 = True
+    def video_needs_transcode(self, video_stream):
+        try:
+            video_codec = video_stream.codec
+        except Exception:
+            print('No valid video stream provided. No need to transcode video.')
+            return False
         if self.cast.cast_type == 'audio':
-            h265 = False
-        device_info = HARDWARE.get((self.cast.cast_info.manufacturer, self.cast.model_name))
-        if device_info and device_info.h265 is not None:
-            h265 = device_info.h265
-        if h265:
-            return video_codec in ('h264', 'h265', 'hevc')
-        else:
-            return video_codec in ('h264',)
+            print('Cast type is audio. No need to transcode video.')
+            return False
+        if video_codec in ['h264', 'vp8']:
+            return False
+        if video_codec in ['h265', 'hevc']:
+            device_info = HARDWARE.get((self.cast.cast_info.manufacturer, self.cast.model_name))
+            if device_info and device_info.h265 is not None:
+                return device_info.h265 is False
+        return True
 
-    def can_play_audio_stream(self, stream):
-        if not stream:
-            return True
-        device_info = HARDWARE.get((self.cast.cast_info.manufacturer, self.cast.model_name))
-        ac3 = device_info.ac3 if device_info else None
-        if ac3:
-            return stream.codec in ('aac', 'mp3', 'ac3')
-        else:
-            return stream.codec in ('aac', 'mp3')
+    def audio_needs_transcode(self, audio_stream):
+        try:
+            audio_codec = audio_stream.codec
+        except:
+            print('No valid audio stream provided. No need to transcode audio.')
+            return False
+        if audio_codec in ['aac', 'mp3', 'vorbis']:
+            return False
+        if audio_codec in ['ac3']:
+            device_info = HARDWARE.get((self.cast.cast_info.manufacturer, self.cast.model_name))
+            if device_info and device_info.ac3 is not None:
+                return device_info.ac3 is False
+        return True
 
     def wait_for_byte(self, offset, buffer=128 * 1024 * 1024):
         if self.done:
