@@ -10,9 +10,13 @@ import time
 import traceback
 import urllib
 from argparse import ArgumentParser
+from logging import getLogger
 
-from gnomecast.metadata import StreamMetadata, FileMetadata
-from gnomecast.transcoder import Transcoder, parse_ffmpeg_time
+from .logger import init_logger
+from .metadata import StreamMetadata, FileMetadata
+from .transcoder import Transcoder, parse_ffmpeg_time
+
+log = getLogger(f'gnomecast.{__name__}')
 
 # TODO
 #  - refactoring: split in multiple files, functions, ...
@@ -1219,14 +1223,18 @@ def parse_args():
     parser.add_argument(
         '-s', '--subtitles', help='subtitles filename'
     )
+    parser.add_argument(
+        '--debug', action='store_true', help='activate debug logging'
+    )
     return parser.parse_args()
 
 
 def main():
-    args = parse_args()
+    args = vars(parse_args())
+    init_logger(debug=args.pop('debug', False))
+    log.info(f'--------- Gnomecast Version {__version__} ---------')
     delete_old_transcodes()
-    caster = Gnomecast()
-    caster.run(**vars(args))
+    Gnomecast().run(**args)
 
 
 if DEPS_MET and __name__ == '__main__':

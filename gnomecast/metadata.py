@@ -4,9 +4,12 @@ import tempfile
 import threading
 import time
 import traceback
+from logging import getLogger
 
 import ffmpeg
 import pycaption
+
+log = getLogger(f'gnomecast.{__name__}')
 
 
 class Metadata:

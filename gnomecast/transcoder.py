@@ -6,6 +6,10 @@ import threading
 import time
 import traceback
 
+from logging import getLogger
+
+log = getLogger(f'gnomecast.{__name__}')
+
 
 class Device:
     def __init__(self, h265=None, ac3=None):
