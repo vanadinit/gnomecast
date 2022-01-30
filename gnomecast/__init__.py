@@ -9,12 +9,12 @@ import threading
 import time
 import traceback
 import urllib
+from argparse import ArgumentParser
 
 from gnomecast.metadata import StreamMetadata, FileMetadata
 from gnomecast.transcoder import Transcoder, parse_ffmpeg_time
 
 # TODO
-#  - arg_parse
 #  - refactoring: split in multiple files, functions, ...
 #  - new feature: controls via chromecast? play, pause, stop
 
@@ -1181,38 +1181,6 @@ class Gnomecast(object):
             threading.Thread(target=self.update_transcoders).start()
 
 
-def arg_parse(args, kw_synonyms, f, usage):
-    kw = None
-    f_args = []
-    f_kwargs = {}
-    for arg in args:
-        if arg.startswith('-'):
-            if kw:
-                f_kwargs[kw] = True
-            arg = arg.lstrip('-')
-            kw = kw_synonyms.get(arg, arg)
-        else:
-            if kw:
-                f_kwargs[kw] = arg
-            else:
-                f_args.append(arg)
-            kw = None
-    if kw:
-        f_kwargs[kw] = True
-    try:
-        f(*f_args, **f_kwargs)
-    except TypeError as e:
-        msg = str(e).split('()', 1)[1].strip()
-        print('ERROR:', msg)
-        print(usage)
-        sys.exit(1)
-
-
-USAGE = '''
-python gnomecast.py [<media_filename>] [-d|--device <chromecast_name>] [-s|--subtitles <subtitles_filename>]
-'''.strip()
-
-
 def pid_running(pid):
     try:
         os.kill(pid, 0)
@@ -1240,10 +1208,25 @@ def delete_old_transcodes():
                 os.remove(fn)
 
 
+def parse_args():
+    parser = ArgumentParser(prog='Gnomecast', description='Cast local media files to Chromecast via Wifi')
+    parser.add_argument(
+        'fn', nargs='?', default=None, help='media filename',
+    )
+    parser.add_argument(
+        '-d', '--device', help='chromecast name'
+    )
+    parser.add_argument(
+        '-s', '--subtitles', help='subtitles filename'
+    )
+    return parser.parse_args()
+
+
 def main():
+    args = parse_args()
     delete_old_transcodes()
     caster = Gnomecast()
-    arg_parse(sys.argv[1:], {'s': 'subtitles', 'd': 'device'}, caster.run, USAGE)
+    caster.run(**vars(args))
 
 
 if DEPS_MET and __name__ == '__main__':
