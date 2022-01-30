@@ -113,31 +113,31 @@ class FileMetadata(Metadata):
         cmd = f'ffmpeg -y -i {self.fn} -vn -an'
         streams_and_files = []
         for stream in self.subtitles:
-            if stream.codec in ['dvdsub', 'pgssub', 'xsub']:
+            if stream.codec in ['dvd_subtitle', 'hdmv_pgs_subtitle', 'xsub']:
                 # See
                 # https://stackoverflow.com/questions/36326790/cant-change-video-subtitles-codec-using-ffmpeg
                 # https://stackoverflow.com/questions/58808907/is-it-possible-to-determine-if-a-subtitle-track-is-imaged-based-or-text-based-wi
-                print('Sorry, image based subtitles are not supported yet.')
+                log.warning('Sorry, image based subtitles are not supported yet.')
                 continue
             srt_fn = tempfile.mkstemp(suffix='.srt', prefix=f'gnomecast_pid{os.getpid()}_subtitles_')[1]
             streams_and_files.append((stream, srt_fn))
             cmd += f' -map {stream.index} -codec srt {srt_fn}'
 
-        print(cmd)
-        try:
-            subprocess.check_output(cmd.split(' '), stderr=subprocess.STDOUT)
-            for stream, srt_fn in streams_and_files:
-                with open(srt_fn) as f:
-                    caps = f.read()
-                # print('caps', caps)
-                converter = pycaption.CaptionConverter()
-                converter.read(caps, pycaption.detect_format(caps)())
-                stream._subtitles = converter.write(pycaption.WebVTTWriter())
-                os.remove(srt_fn)
-        except subprocess.CalledProcessError as exc:
-            print('ERROR processing subtitles:', exc)
-            traceback.print_tb(exc.__traceback__)
-            self.subtitles = []
+        if streams_and_files:
+            log.debug(cmd)
+            try:
+                subprocess.check_output(cmd.split(' '), stderr=subprocess.STDOUT)
+                for stream, srt_fn in streams_and_files:
+                    with open(srt_fn) as f:
+                        caps = f.read()
+                    # print('caps', caps)
+                    converter = pycaption.CaptionConverter()
+                    converter.read(caps, pycaption.detect_format(caps)())
+                    stream._subtitles = converter.write(pycaption.WebVTTWriter())
+                    os.remove(srt_fn)
+            except subprocess.CalledProcessError as exc:
+                log.exception(f'ERROR processing subtitles: {exc}')
+                self.subtitles = []
 
     def details(self):
         return \

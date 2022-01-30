@@ -41,7 +41,7 @@ class Transcoder(object):
         if prev_transcoder:
             prev_transcoder.destroy()
 
-        print('Transcoder', fn)
+        log.info(f'Transcoder {fn}')
         # As far as I discovered the container format is not significant for the transcoding decision.
         # transcode_container = fmd.container not in ('mp4', 'aac', 'mp3', 'wav')
         self.transcode_video = force_video or self.video_needs_transcode(self.video_stream)
@@ -53,7 +53,11 @@ class Transcoder(object):
         self.progress_seconds = 0
         self.done_callback = done_callback
         self.error_callback = error_callback
-        print('transcode, transcode_video, transcode_audio', self.transcode, self.transcode_video, self.transcode_audio)
+        log.info(
+            f'transcode: {self.transcode},'
+            f' transcode_video: {self.transcode_video},'
+            f' transcode_audio: {self.transcode_audio}'
+        )
 
         # Uncomment next line to test different formats without transcoding
         # self.transcode = False
@@ -100,16 +104,15 @@ class Transcoder(object):
                     self.transcode_cmd += ['-b:a', '256k']
             self.transcode_cmd += ['-c:v', 'h264' if self.transcode_video else 'copy']  # '-movflags', 'faststart'
             self.transcode_cmd += [self.trans_fn]
-            print(self.transcode_cmd)
-            print(' '.join(["'%s'" % s if ' ' in s else s for s in self.transcode_cmd]))
+            log.debug(self.transcode_cmd)
             if fake:
                 self.p = None
                 self.monitor()
             else:
-                print('---------------------')
-                print(' starting ffmpeg at:')
-                print('---------------------')
-                traceback.print_stack()
+                log.info('-----------------')
+                log.info(' starting ffmpeg ')
+                log.info('-----------------')
+                log.debug(''.join(traceback.format_stack()))
                 self.p = subprocess.Popen(self.transcode_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
                 t = threading.Thread(target=self.monitor)
                 t.daemon = True
@@ -126,14 +129,15 @@ class Transcoder(object):
         try:
             video_codec = video_stream.codec
         except Exception:
-            print('No valid video stream provided. No need to transcode video.')
+            log.warning('No valid video stream provided. No need to transcode video.')
             return False
         if self.cast.cast_type == 'audio':
-            print('Cast type is audio. No need to transcode video.')
+            log.warning('Cast type is audio. No need to transcode video.')
             return False
         if video_codec in ['h264', 'vp8']:
             return False
         if video_codec in ['h265', 'hevc']:
+            log.debug('Detected h265/hevc codec. Lets see if our device can handle this.')
             device_info = HARDWARE.get((self.cast.cast_info.manufacturer, self.cast.model_name))
             if device_info and device_info.h265 is not None:
                 return device_info.h265 is False
@@ -143,11 +147,12 @@ class Transcoder(object):
         try:
             audio_codec = audio_stream.codec
         except:
-            print('No valid audio stream provided. No need to transcode audio.')
+            log.warning('No valid audio stream provided. No need to transcode audio.')
             return False
         if audio_codec in ['aac', 'mp3', 'vorbis']:
             return False
         if audio_codec in ['ac3']:
+            log.debug('Detected ac3 codec. Lets see if our device can handle this.')
             device_info = HARDWARE.get((self.cast.cast_info.manufacturer, self.cast.model_name))
             if device_info and device_info.ac3 is not None:
                 return device_info.ac3 is False
@@ -158,17 +163,17 @@ class Transcoder(object):
             return
         if self.source_fn.lower().split(".")[-1] == 'mp4':
             while offset > self.progress_bytes + buffer:
-                print('waiting for', offset, 'at', self.progress_bytes + buffer)
+                log.info(f'waiting for {offset} at {self.progress_bytes + buffer}')
                 time.sleep(2)
         else:
             while not self.done:
-                print('waiting for transcode to finish')
+                log.info('waiting for transcode to finish')
                 time.sleep(2)
-        print('done waiting')
+        log.info('done waiting')
 
     def monitor(self):
         line = b''
-        r = re.compile(r'=\s+')
+        r = re.compile(r'\w+=\s*\S+')
         total_output = b''
         while self.p:
             byte = self.p.stdout.read(1)
@@ -180,18 +185,17 @@ class Transcoder(object):
                 if byte == b'\r':
                     # frame=92578 fps=3937 q=-1.0 size= 1142542kB time=01:04:21.14 bitrate=2424.1kbits/s speed= 164x
                     line = line.decode()
-                    line = r.sub('=', line)
-                    items = [s.split('=') for s in line.split()]
-                    d = dict([x for x in items if len(x) == 2])
-                    print(d)
+                    items = [s.split('=') for s in r.findall(line)]
+                    d = {k: v.lstrip() for k, v in items}
+                    print(d, end='\r')
                     self.progress_bytes = int(d.get('size', '0kb')[:-2]) * 1024
                     self.progress_seconds = parse_ffmpeg_time(d.get('time', '00:00:00'))
                     line = b''
         if self.p:
             self.p.stdout.close()
             if self.p.returncode:
-                print('--== transcode error ==--')
-                print(total_output)
+                log.error('--== transcode error ==--')
+                log.error(total_output)
                 self.error_callback(total_output.decode())
                 return
         self.done = True
