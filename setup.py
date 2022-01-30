@@ -31,12 +31,19 @@ setup(
         'Programming Language :: Python :: 3',
     ],
     python_requires='>=3.6',
-    install_requires=['pychromecast', 'bottle', 'pycaption', 'paste', 'html5lib'],
+    install_requires=[
+        'pychromecast>=10.0',
+        'bottle',
+        'pycaption',
+        'paste',
+        'html5lib',
+        'ffmpeg-python',
+    ],
     data_files=[
         ('share/icons/hicolor/16x16/apps', ['icons/gnomecast_16.png']),
         ('share/icons/hicolor/48x48/apps', ['icons/gnomecast_48.png']),
         ('share/icons/hicolor/scalable/apps', ['icons/gnomecast.svg']),
-        ('share/applications', ['gnomecast.desktop'])
+        ('share/applications', ['gnomecast.desktop']),
     ],
     entry_points={
         'gui_scripts': [

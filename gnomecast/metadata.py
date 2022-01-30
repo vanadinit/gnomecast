@@ -3,9 +3,10 @@ import subprocess
 import tempfile
 import threading
 import time
+import traceback
 
-import pycaption
 import ffmpeg
+import pycaption
 
 
 class Metadata:
@@ -95,7 +96,7 @@ class FileMetadata(Metadata):
             elif stream.get('codec_type') == 'subtitle':
                 self.subtitles.append(StreamMetadata(
                     index=index,
-                    codec=None,
+                    codec=stream['codec_name'],
                     title=stream['tags']['language'],
                 ))
 
@@ -106,17 +107,23 @@ class FileMetadata(Metadata):
     def load_subtitles(self):
         if not self.subtitles:
             return
-        cmd = ['ffmpeg', '-y', '-i', self.fn, '-vn', '-an', ]
-        files = []
+        cmd = f'ffmpeg -y -i {self.fn} -vn -an'
+        streams_and_files = []
         for stream in self.subtitles:
-            srt_fn = tempfile.mkstemp(suffix='.srt', prefix='gnomecast_pid%i_subtitles_' % os.getpid())[1]
-            files.append(srt_fn)
-            cmd += ['-map', stream.index, '-codec', 'srt', srt_fn]
+            if stream.codec in ['dvdsub', 'pgssub', 'xsub']:
+                # See
+                # https://stackoverflow.com/questions/36326790/cant-change-video-subtitles-codec-using-ffmpeg
+                # https://stackoverflow.com/questions/58808907/is-it-possible-to-determine-if-a-subtitle-track-is-imaged-based-or-text-based-wi
+                print('Sorry, image based subtitles are not supported yet.')
+                continue
+            srt_fn = tempfile.mkstemp(suffix='.srt', prefix=f'gnomecast_pid{os.getpid()}_subtitles_')[1]
+            streams_and_files.append((stream, srt_fn))
+            cmd += f' -map {stream.index} -codec srt {srt_fn}'
 
         print(cmd)
         try:
-            output = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-            for stream, srt_fn in zip(self.subtitles, files):
+            subprocess.check_output(cmd.split(' '), stderr=subprocess.STDOUT)
+            for stream, srt_fn in streams_and_files:
                 with open(srt_fn) as f:
                     caps = f.read()
                 # print('caps', caps)
@@ -126,6 +133,7 @@ class FileMetadata(Metadata):
                 os.remove(srt_fn)
         except subprocess.CalledProcessError as exc:
             print('ERROR processing subtitles:', exc)
+            traceback.print_tb(exc.__traceback__)
             self.subtitles = []
 
     def details(self):

@@ -289,7 +289,7 @@ class Gnomecast(object):
             for cc in chromecasts:
                 friendly_name = cc.name
                 if cc.cast_type != 'cast':
-                    friendly_name = '%s (%s)' % (friendly_name, cc.cast_type)
+                    friendly_name = f'{friendly_name} ({cc.cast_type})'
                 self.cast_store.append([cc, friendly_name])
             if device:
                 found = False
@@ -301,7 +301,7 @@ class Gnomecast(object):
                     self.cast_combo.set_active(0)
                     dialog = Gtk.MessageDialog(self.win, 0, Gtk.MessageType.ERROR, Gtk.ButtonsType.CLOSE,
                                                "Chromecast Not Found")
-                    dialog.format_secondary_text("The Chromecast '%s' wasn't found." % device)
+                    dialog.format_secondary_text(f"The Chromecast '{device}' wasn't found.")
                     dialog.run()
                     dialog.destroy()
             else:
